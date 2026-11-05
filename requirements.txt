@@ -1,0 +1,21 @@
+# Python 3.10+ (pins chosen to support 3.10 through 3.12)
+
+# Core numerics / data
+numpy==2.2.6
+pandas==2.2.3
+scipy==1.15.3
+
+# Machine learning
+scikit-learn==1.6.1
+torch==2.7.1
+torchvision==0.22.1
+
+# Images
+pillow==11.2.1
+
+# Visualisation
+matplotlib==3.10.3
+seaborn==0.13.2
+
+# Testing
+pytest==8.3.5
