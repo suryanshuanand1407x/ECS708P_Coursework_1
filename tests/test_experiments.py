@@ -7,7 +7,11 @@ import numpy as np
 import pytest
 
 from src.clustering import purity_score
-from src.data_loader import FILES, RAW_DIR, load_splits, make_split_indices, read_idx
+from src.data_loader import FILES, RAW_DIR, load_splits, make_split_indices, read_idx, stratified_subsample
+from src.representation import (
+    components_for_variance, embed_2d, fit_pca, mle_intrinsic_dimension, project, reconstruct, reconstruction_mse,
+    tsne_embed,
+)
 
 MODULES = [
     "src.data_loader",
@@ -73,3 +77,88 @@ def test_load_splits_shapes_and_ranges(tmp_path) -> None:
         assert set(np.unique(y)) == set(range(10))
     assert (np.bincount(splits.y_val) == 1000).all()
     assert (np.bincount(splits.y_test) == 1000).all()
+
+
+def _low_rank_data(n: int = 600, dim: int = 40, rank: int = 5, seed: int = 0) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    return rng.normal(size=(n, rank)) @ rng.normal(size=(rank, dim)) + 3.0
+
+
+def test_stratified_subsample_balanced_and_deterministic() -> None:
+    y = np.repeat(np.arange(10), 500)
+    idx = stratified_subsample(y, 1000, seed=42)
+    np.testing.assert_array_equal(idx, stratified_subsample(y, 1000, seed=42))
+    assert (np.bincount(y[idx]) == 100).all()
+    assert len(np.unique(idx)) == 1000
+
+
+def test_pca_statistics_come_from_train_only() -> None:
+    X = _low_rank_data()
+    X_train, X_val = X[:400], X[400:] + 100.0
+    pca = fit_pca(X_train, seed=42)
+    np.testing.assert_allclose(pca.mean_, X_train.mean(axis=0))
+    assert not np.allclose(pca.mean_, np.vstack([X_train, X_val]).mean(axis=0))
+
+
+def test_components_for_variance_on_low_rank_data() -> None:
+    pca = fit_pca(_low_rank_data(rank=5), seed=42)
+    k_for = components_for_variance(pca, (0.90, 0.999999))
+    assert k_for[0.999999] == 5
+    assert 1 <= k_for[0.90] <= 5
+
+
+def test_reconstruction_error_decreases_and_vanishes_at_full_rank() -> None:
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(300, 20))
+    pca = fit_pca(X, seed=42)
+    mse = reconstruction_mse(pca, X, [1, 5, 10, 20], batch_size=128)
+    assert all(a > b for a, b in zip(mse, mse[1:]))
+    assert mse[-1] < 1e-20
+    np.testing.assert_allclose(reconstruct(pca, X, 20), X, atol=1e-10)
+
+
+def test_mle_intrinsic_dimension_recovers_linear_subspace() -> None:
+    X = _low_rank_data(n=2000, dim=40, rank=5)
+    assert 4.0 < mle_intrinsic_dimension(X, n_neighbors=20, sample_size=2000, seed=42) < 6.0
+
+
+def test_tsne_is_deterministic_for_fixed_seed() -> None:
+    X = _low_rank_data(n=150, dim=10, rank=3)
+    np.testing.assert_array_equal(tsne_embed(X, perplexity=10, seed=42), tsne_embed(X, perplexity=10, seed=42))
+
+
+def _labelled_low_rank_data(n_per_class: int = 40, n_classes: int = 10, dim: int = 30, seed: int = 0):
+    rng = np.random.default_rng(seed)
+    y = np.repeat(np.arange(n_classes), n_per_class)
+    centres = rng.normal(scale=5.0, size=(n_classes, dim))
+    return centres[y] + rng.normal(size=(len(y), dim)), y
+
+
+@pytest.mark.parametrize("k", [1, 2, 10, 30])
+def test_projection_and_reconstruction_shapes(k: int) -> None:
+    X, _ = _labelled_low_rank_data()
+    X_train, X_val = X[:300], X[300:]
+    pca = fit_pca(X_train, seed=42)
+    assert project(pca, X_val, k).shape == (len(X_val), k)
+    assert reconstruct(pca, X_val, k).shape == X_val.shape
+    assert len(reconstruction_mse(pca, X_val, [k])) == 1
+
+
+def test_embed_2d_shapes_and_stratified_subsample() -> None:
+    X, y = _labelled_low_rank_data()
+    pca = fit_pca(X, seed=42)
+    idx, Z_pca, Z_tsne = embed_2d(pca, X, y, n_samples=200, perplexity=10, tsne_pca_dim=5, seed=42)
+    assert idx.shape == (200,)
+    assert Z_pca.shape == (200, 2) and Z_tsne.shape == (200, 2)
+    assert (np.bincount(y[idx]) == 20).all()
+    np.testing.assert_allclose(Z_pca, project(pca, X[idx], 2))
+
+
+@pytest.mark.skipif(not RAW_DATA_PRESENT, reason="Fashion-MNIST not downloaded")
+def test_pca_on_fashion_mnist_shapes(tmp_path) -> None:
+    splits = load_splits(seed=42, split_path=tmp_path / "split.npz")
+    pca = fit_pca(splits.X_train[:5_000], n_components=200, seed=42)
+    assert pca.components_.shape == (200, 784)
+    k_for = components_for_variance(pca, (0.90,))
+    assert project(pca, splits.X_val, k_for[0.90]).shape == (10_000, k_for[0.90])
+    assert reconstruct(pca, splits.X_val[:100], 50).shape == (100, 784)

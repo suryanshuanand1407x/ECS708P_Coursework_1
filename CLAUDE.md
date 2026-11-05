@@ -7,6 +7,7 @@ The rules below are **mandatory**. Code that violates them must not be committed
 
 ```
 coursework_execution_directive.md   Execution guide (phases, questions, definition of done)
+ECS708P_interim_representation.ipynb  Interim submission notebook; thin layer over src/ + experiments/ plot functions
 docs/                 Coursework brief and notes; REQUIREMENTS_MAP.md maps requirements → experiments → outputs
 data/raw/fashion-mnist/  Original Fashion-MNIST .gz files (immutable)
 data/processed/       Derived data, incl. split_indices.npz
@@ -100,6 +101,9 @@ for a model evaluated on held-out data.
 - Save every plot to `outputs/figures/` at **300 DPI**: `fig.savefig(path, dpi=300, bbox_inches="tight")`.
 - Every figure must have a **descriptive title**, **labeled axes** (with units where applicable), and a **legend**
   whenever more than one series/class/cluster is shown.
+- Image grids (samples, reconstructions, components) replace axes with row/column labels; signed images get a colorbar.
+- Use the shared style and palette in `src/evaluate.py` (`apply_style`, `SERIES`, `save_figure`). More than 3 classes in
+  one scatter → small multiples (`plot_class_small_multiples`), not 10 colours.
 - Use descriptive filenames, e.g. `pca_explained_variance.png`, `kmeans_k8_clusters_pca2d.png`.
 - Close figures after saving (`plt.close(fig)`); do not call `plt.show()` in pipeline code.
 

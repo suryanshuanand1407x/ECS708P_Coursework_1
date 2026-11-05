@@ -19,3 +19,8 @@ seaborn==0.13.2
 
 # Testing
 pytest==8.3.5
+
+# Notebooks
+jupyterlab==4.3.5
+ipykernel==6.29.5
+nbconvert==7.16.6

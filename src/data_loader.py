@@ -90,6 +90,14 @@ def make_split_indices(
     return np.sort(train_idx), np.sort(val_idx)
 
 
+def stratified_subsample(y: np.ndarray, n: int, seed: int = 42) -> np.ndarray:
+    """Sorted indices of a class-balanced subsample of size n."""
+    if n >= len(y):
+        return np.arange(len(y))
+    idx, _ = train_test_split(np.arange(len(y)), train_size=n, stratify=y, random_state=seed)
+    return np.sort(idx)
+
+
 def load_splits(
     val_size: int = 10_000,
     seed: int = 42,

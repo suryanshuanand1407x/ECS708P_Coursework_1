@@ -1,1 +1,109 @@
-# ECS708P_Coursework_1
+# ECS708P Coursework 1 — Understanding Visual Data
+
+Representation learning, clustering and classification on **Fashion-MNIST**
+(70,000 grayscale 28×28 images, 10 clothing classes).
+
+**Interim submission:** [`ECS708P_interim_representation.ipynb`](ECS708P_interim_representation.ipynb), which covers
+PCA (explained variance, the 90%/95% thresholds, reconstruction error vs *k*) and 2D PCA vs t-SNE embeddings.
+The notebook is committed with all outputs, so it can be read without running anything.
+
+## Reproducing the results
+
+Tested on macOS (Apple Silicon) with Python 3.10.13. Any Python 3.10–3.12 should work.
+
+### 1. Set up the environment
+
+```bash
+git clone https://github.com/suryanshuanand1407x/ECS708P_Coursework_1.git
+cd ECS708P_Coursework_1
+python3.10 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt    # all versions pinned
+```
+
+### 2. Data (no manual download)
+
+The first run downloads the four Fashion-MNIST files from the
+[official repository](https://github.com/zalandoresearch/fashion-mnist) into `data/raw/fashion-mnist/` and checks
+each one against its published MD5 checksum. If you already have the `.gz` files, put them in that folder.
+
+Splits are fixed and deterministic (`seed = 42`):
+
+| Split | Images | Source |
+|---|---|---|
+| Train | 50,000 | Official training set, stratified split |
+| Validation | 10,000 | Official training set, stratified split (1,000 per class) |
+| Test | 10,000 | Official test set, held out; never used in the interim analysis |
+
+The split indices are saved to `data/processed/split_indices.npz` the first time they are made.
+
+### 3. Run the interim analysis
+
+Either run the notebook:
+
+```bash
+jupyter lab ECS708P_interim_representation.ipynb   # then "Run All"
+# or headless:
+jupyter nbconvert --to notebook --execute --inplace ECS708P_interim_representation.ipynb
+```
+
+or use the command-line runner, which produces the same figures and metrics:
+
+```bash
+python -m experiments.run_representation --seed 42 --save_dir outputs/
+```
+
+Run every command from the repository root. Either way takes about 30–40 seconds on a laptop CPU.
+
+### 4. Outputs
+
+| File | Content |
+|---|---|
+| `outputs/figures/pca_explained_variance.png` | Scree plot and cumulative explained variance, with the 90/95/99% thresholds |
+| `outputs/figures/reconstruction_samples.png` | Original vs reconstructed validation images (5 classes, k = 10, 50, 187) |
+| `outputs/figures/manifold_2d_pca_vs_tsne.png` | 2D PCA vs t-SNE (5,000 stratified training images, perplexity 30) |
+| `outputs/figures/reconstruction_mse_vs_k.png` | Train vs validation reconstruction error across k |
+| `outputs/metrics/representation_interim.json` | Components for 90/95% variance; error table for k = 2, 10, 50, 84, 100, 187, 200 |
+| `outputs/metrics/*.csv`, `representation_metrics.json` | Full error grid, intrinsic dimension, separability vs k (runner only) |
+
+All figures are saved at 300 DPI.
+
+### 5. Tests
+
+```bash
+pytest
+```
+
+The tests check split determinism and stratification, that PCA statistics are fitted on the training split only,
+reconstruction correctness, the intrinsic-dimension estimator, t-SNE seeding, and the shapes of all transformed
+outputs.
+
+## Reproducibility and methodology
+
+- **Fixed seeds:** every random step (splitting, subsampling, t-SNE, PyTorch) takes `seed = 42`, and the CLI
+  takes `--seed`. Repeated runs produce byte-identical metric files on the same platform.
+- **No data leakage:** PCA and any scaler or model are fitted on the training split only. Validation and test data
+  only ever go through `.transform()`. Pixels are scaled by the constant 1/255, which isn't fitted to anything.
+- **Test set evaluated once:** the test split is kept for a single final out-of-sample evaluation.
+- **Pinned dependencies:** `requirements.txt` pins every package version.
+
+## Repository structure
+
+```
+ECS708P_interim_representation.ipynb   Interim submission notebook (executed)
+src/
+  data_loader.py       Download, MD5 check, IDX parsing, fixed train/val/test split
+  representation.py    PCA, reconstruction error, intrinsic dimension (MLE), 2D PCA/t-SNE embeddings
+  clustering.py        Clustering metrics (purity); clustering methods to follow
+  classification.py    Supervised models (final submission)
+  evaluate.py          Figure style, 300-DPI figure and metric writers, k-NN separability probe
+  utils.py             Seeding and output paths
+experiments/
+  run_representation.py   CLI runner for the representation analysis (--seed, --save_dir)
+  run_clustering.py       (final submission)
+  run_classification.py   (final submission)
+tests/test_experiments.py Determinism, leakage and shape tests
+docs/REQUIREMENTS_MAP.md  Requirement → experiment → output mapping
+data/                     Raw and processed data (git-ignored, created on first run)
+outputs/                  Figures and metrics (git-ignored, regenerated by the commands above)
+```

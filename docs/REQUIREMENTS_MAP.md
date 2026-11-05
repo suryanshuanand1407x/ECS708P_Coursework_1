@@ -26,12 +26,18 @@ test is evaluated **once**, for the final selected models, via `run_classificati
 
 ## A. Representation & latent structure — `experiments/run_representation.py`
 
+**Status: done (2026-11-05).** Deterministic (identical metric files across 3 runs, `--seed 42`).
+
+**Interim submission deliverables** (`--seed 42 --save_dir outputs/`): `pca_explained_variance.png`,
+`reconstruction_samples.png` (5 classes, k = 10/50/187), `manifold_2d_pca_vs_tsne.png` (5,000 stratified train
+samples, t-SNE perplexity 30), `representation_interim.json` (90/95% thresholds, MSE at k = 2/10/50/84/100/187/200).
+
 | Requirement | Method | Output |
 |---|---|---|
-| Intrinsic dimensionality | PCA spectrum, components at 90/95/99% variance, MSE elbow | `representation_metrics.json` |
+| Intrinsic dimensionality | PCA spectrum (linear) vs Levina–Bickel MLE (non-linear, k-NN = 10/20) | `representation_metrics.json` |
 | Components for 90% and 95% variance | Cumulative explained variance of PCA fit on train | `pca_explained_variance.png`, `representation_metrics.json` |
-| Reconstruction MSE vs k | PCA inverse transform, k ∈ {2,5,10,20,50,100,200,300,784}, train and val | `reconstruction_mse_vs_k.png`, `reconstruction_mse.csv` |
-| 2D/3D class separation | PCA 2D/3D, t-SNE 2D (subsample), coloured by class | `pca_2d.png`, `pca_3d.png`, `tsne_2d.png` |
+| Reconstruction MSE vs k | PCA inverse transform, k from 1 to 784 (17 values plus k90/k95/k99), train and val | `reconstruction_mse_vs_k.png`, `reconstruction_mse.csv` |
+| 2D/3D class separation | PCA-2D and t-SNE-2D small multiples (10k train subsample); 2D/3D answered quantitatively by 5-NN val accuracy and label silhouette vs k | `pca_2d_by_class.png`, `tsne_2d_by_class.png`, `separability_vs_dim.png`, `separability_vs_dim.csv` |
 | Supporting visuals | Mean image per class, top principal components as images, reconstructions at several k | `class_means.png`, `pca_components.png`, `pca_reconstructions.png` |
 | Optional (if brief requires) | Small PyTorch autoencoder, MSE vs latent size compared with PCA | `autoencoder_mse.csv` |
 
